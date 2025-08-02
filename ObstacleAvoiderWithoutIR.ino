@@ -21,6 +21,9 @@ const unsigned int ENR = 4;
 L298N motorL(ENL, IN1, IN2);
 L298N motorR(ENR, IN3, IN4);
 
+//state tracking
+bool lastTurnLeft = false;
+int stuckCounter = 0;
 
 
 long ultraSonicDistance(int triggerPin, int echoPin) {
@@ -35,14 +38,20 @@ long ultraSonicDistance(int triggerPin, int echoPin) {
   return pulseIn(echoPin, HIGH);  
   }
 
-void turnLeft() {
+void turnLeft(unsigned long duration) {
   motorL.backward();
   motorR.forward();
+  delay(duration);
+  motorL.stop();
+  motorR.stop();
 }
 
-void turnRight() {
+void turnRight(unsigned long duration) {
   motorL.forward();
   motorR.backward();
+  delay(duration);
+  motorL.stop();
+  motorR.stop();
 }
 
 long angleIR(int angle) {
@@ -70,6 +79,8 @@ void setup() {
 
   //LED
   pinMode(13, OUTPUT);
+
+  randomSeed(analogRead(A0));
 }
 
 void loop() {
@@ -81,7 +92,7 @@ void loop() {
 
  
 
-  if (cm <= 7) {
+  if (cm <= 25) {
     
     digitalWrite(13, HIGH);
     Serial.println("Obstacle detected!");
@@ -105,15 +116,39 @@ void loop() {
     long rightSide = angleIR(30);
     servo1.write(90);
 
-    if (leftSide > rightSide) {
+    if (abs(leftSide - rightSide) < 10) {
+      if (random(0, 2) == 0) {
+        Serial.println("Randomly turning left!");
+        turnLeft(600);
+        lastTurnLeft = true;
+      }
+      else {
+        Serial.println("Randomly turning right!");
+        turnRight(600);
+        lastTurnLeft = false;
+      }
+
+    }
+
+    else if (leftSide > rightSide) {
       Serial.println("Turning left!");
-      turnLeft();
-      delay(100);
+      turnLeft(600);
+      lastTurnLeft = true;
     } 
-    else {
+       else {
       Serial.println("Turning Right!");
-      turnRight();
-      delay(100);
+      turnRight(600);
+      lastTurnLeft = false;
+    }
+
+    stuckCounter++;
+    if (stuckCounter >= 3) {
+      Serial.println("Stuck detected! Performing escape!");
+      motorL.backward();
+      motorR.backward();
+      delay(1000);
+      turnLeft(1000);
+      stuckCounter = 0;
     }
 
     delay(1000);
@@ -138,6 +173,6 @@ void loop() {
 
     }
  
-  delay(50);
+  delay(100);
     
 }
